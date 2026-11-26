@@ -1,5 +1,5 @@
-// CK的规矩 —— 把对话规矩注入系统提示，并提供执行权限档位。
-// 只用官方 systemPrompt.section()，不改宿主文件、不打补丁。
+// CK的规矩 —— 把对话规矩注入系统提示，并提供执行权限档位与状态面板。
+// 只用官方 systemPrompt.section() 与 webServer 路由，不改宿主文件、不打补丁。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,10 +17,16 @@ const MODE_TEXT = {
     '执行权限：严格。每一步都先说明并等确认，读文件、写文件、跑命令都一样；不要连续自动执行多个步骤。',
 };
 
-function readPrompt(config) {
-  const file = config.promptFile
+const MODE_LABEL = { loose: '宽松', standard: '标准', strict: '严格' };
+
+function resolvePromptFile(config) {
+  return config.promptFile
     ? path.resolve(String(config.promptFile))
     : path.join(HERE, 'prompt', 'default.md');
+}
+
+function readPrompt(config) {
+  const file = resolvePromptFile(config);
   try {
     return { text: fs.readFileSync(file, 'utf8'), file };
   } catch (error) {
@@ -28,11 +34,62 @@ function readPrompt(config) {
   }
 }
 
-export function apply(ctx, config = {}) {
-  if (config.enabled === false) return;
+function normalizeMode(mode) {
+  return MODE_TEXT[mode] ? mode : 'standard';
+}
 
+export function apply(ctx, config = {}) {
+  const enabled = config.enabled !== false;
+  const mode = normalizeMode(config.permissionMode);
   const order = Number.isFinite(config.order) ? Number(config.order) : DEFAULT_ORDER;
-  const mode = MODE_TEXT[config.permissionMode] ? config.permissionMode : 'standard';
+
+  // ---- 状态接口：给右侧栏面板读 ----
+  ctx.inject(['webServer'], (host) => {
+    host.effect(() => {
+      const dispose = host.webServer.register(
+        {
+          kind: 'exact',
+          path: '/ck-rules/status',
+          handler: async (request, response) => {
+            if (request.method !== 'GET') {
+              response.writeHead(405, { allow: 'GET' });
+              response.end();
+              return;
+            }
+            const prompt = readPrompt(config);
+            const body = JSON.stringify({
+              ok: true,
+              version: '0.2.0',
+              enabled,
+              mode,
+              modeLabel: MODE_LABEL[mode],
+              ownerName: String(config.ownerName || ''),
+              promptFile: prompt.file,
+              promptChars: prompt.text.length,
+              promptMissing: Boolean(prompt.error),
+              sectionName: 'ck-rules:rules',
+              order,
+            });
+            response.writeHead(200, {
+              'content-type': 'application/json; charset=utf-8',
+              'cache-control': 'no-store',
+            });
+            response.end(body);
+          },
+        },
+        'ck-rules status'
+      );
+      return () => {
+        if (typeof dispose === 'function') dispose();
+      };
+    });
+  });
+
+  if (!enabled) {
+    console.log('[ck-rules] 注入已关闭（enabled=false），面板仍可用');
+    return;
+  }
+
   const { text, file, error } = readPrompt(config);
   if (error) {
     console.warn(`[ck-rules] 规矩文件读不到：${file}（${error.code || error.message}）`);
