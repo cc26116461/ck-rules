@@ -1,0 +1,8 @@
+- insert:
+    - id: ck-rules
+      name: ck-rules
+      config:
+        enabled: true
+        ownerName: ""
+        permissionMode: standard
+        promptFile: ""

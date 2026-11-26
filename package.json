@@ -1,0 +1,29 @@
+{
+  "name": "ck-rules",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "把你自己的对话规矩注入每次会话，并提供执行权限档位与规则体检。",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "prompt",
+    "locale",
+    "docs",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

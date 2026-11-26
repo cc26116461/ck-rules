@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "CK rules",
+    "description": "Inject your own conversation rules into every session, with an execution permission level.",
+    "detail": "docs/DETAIL.md"
+  }
+}
